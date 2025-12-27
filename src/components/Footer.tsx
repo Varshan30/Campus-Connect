@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="container mx-auto px-6 py-10">
         <div className="flex flex-col md:flex-row md:justify-between gap-8">
           {/* Brand */}
-          <div className="md:max-w-xs">
+          <div className="md:max-w-xs md:ml-4">
             <h3 className="font-display text-base font-semibold text-foreground mb-2">
               Campus Lost & Found
             </h3>
