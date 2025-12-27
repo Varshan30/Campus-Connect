@@ -23,12 +23,12 @@ const Landing = () => {
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" />
         
-        {/* Decorative blobs */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
+        {/* Decorative blobs - using transform for GPU acceleration */}
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl will-change-transform" style={{ animation: 'float 6s ease-in-out infinite' }} />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl will-change-transform" style={{ animation: 'float 6s ease-in-out infinite 2s' }} />
 
         <div className="container relative mx-auto px-4 py-20 md:py-32">
-          <div className="max-w-4xl mx-auto text-center stagger-children">
+          <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8">
               <span className="relative flex h-2 w-2">
@@ -39,11 +39,13 @@ const Landing = () => {
             </div>
 
             {/* Main heading */}
-            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6">
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 animate-fade-in">
               Lost something?
               <br />
-              Let's{' '}
-              <TypewriterText phrases={typewriterPhrases} />
+              <span className="inline-flex items-baseline flex-wrap justify-center">
+                <span>Let's&nbsp;</span>
+                <TypewriterText phrases={typewriterPhrases} />
+              </span>
             </h1>
 
             {/* Subtitle */}
