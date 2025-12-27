@@ -22,11 +22,8 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-display font-bold">
-              L&F
-            </div>
-            <span className="hidden sm:block font-display text-lg font-semibold text-foreground">
+          <Link to="/" className="flex items-center">
+            <span className="font-display text-lg font-semibold text-foreground">
               Campus Lost & Found
             </span>
           </Link>
