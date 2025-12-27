@@ -1,93 +1,74 @@
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 const Footer = () => {
-  const quickLinks = [
-    { label: 'Browse Items', to: '/browse' },
-    { label: 'Report Item', to: '/report' },
-    { label: 'Settings', to: '/settings' },
-  ];
-
-  const categories = ['Electronics', 'Books & Notes', 'Clothing', 'Keys & IDs'];
-
-  const contactInfo = [
-    { icon: MapPin, text: 'Student Center, Room 101' },
-    { icon: Mail, text: 'lostandfound@campus.edu' },
-    { icon: Phone, text: '(555) 123-4567' },
-  ];
-
   return (
-    <footer className="relative bg-card border-t border-border mt-auto overflow-hidden">
-      {/* Subtle gradient accent */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
-      
-      <div className="relative container mx-auto px-6 py-12">
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8">
-          
-          {/* Brand Section */}
-          <div className="md:col-span-4">
-            <h3 className="font-display text-lg font-bold text-foreground mb-3">
+    <footer className="bg-card border-t border-border mt-auto">
+      <div className="container mx-auto px-6 py-10">
+        <div className="flex flex-col md:flex-row md:justify-between gap-8">
+          {/* Brand */}
+          <div className="md:max-w-xs">
+            <h3 className="font-display text-base font-semibold text-foreground mb-2">
               Campus Lost & Found
             </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+            <p className="text-sm text-muted-foreground">
               Helping students reconnect with their belongings since 2024.
             </p>
           </div>
 
-          {/* Links Section */}
-          <div className="md:col-span-2">
-            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-4">
-              Links
-            </h4>
-            <ul className="space-y-3">
-              {quickLinks.map((link) => (
-                <li key={link.to}>
-                  <Link
-                    to={link.to}
-                    className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <ArrowRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                    <span>{link.label}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Links Grid */}
+          <div className="flex flex-wrap gap-12 md:gap-16">
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                Links
+              </h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/browse" className="text-muted-foreground hover:text-primary transition-colors">Browse Items</Link></li>
+                <li><Link to="/report" className="text-muted-foreground hover:text-primary transition-colors">Report Item</Link></li>
+                <li><Link to="/settings" className="text-muted-foreground hover:text-primary transition-colors">Settings</Link></li>
+              </ul>
+            </div>
 
-          {/* Categories Section */}
-          <div className="md:col-span-3">
-            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-4">
-              Categories
-            </h4>
-            <ul className="space-y-3">
-              {categories.map((cat) => (
-                <li key={cat} className="text-sm text-muted-foreground">
-                  {cat}
-                </li>
-              ))}
-            </ul>
-          </div>
+            {/* Categories */}
+            <div>
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                Categories
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>Electronics</li>
+                <li>Books & Notes</li>
+                <li>Clothing</li>
+                <li>Keys & IDs</li>
+              </ul>
+            </div>
 
-          {/* Contact Section */}
-          <div className="md:col-span-3">
-            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-4">
-              Contact Us
-            </h4>
-            <ul className="space-y-3">
-              {contactInfo.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <item.icon className="h-4 w-4 mt-0.5 text-primary/70 shrink-0" />
-                  <span>{item.text}</span>
+            {/* Contact */}
+            <div>
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                Contact
+              </h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  Student Center, Room 101
                 </li>
-              ))}
-            </ul>
+                <li className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-primary" />
+                  lostandfound@campus.edu
+                </li>
+                <li className="flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-primary" />
+                  (555) 123-4567
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-10 pt-6 border-t border-border/50">
-          <p className="text-xs text-muted-foreground text-center">
+        {/* Bottom */}
+        <div className="mt-8 pt-6 border-t border-border/50 text-center">
+          <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Campus Lost & Found. All rights reserved.
           </p>
         </div>
