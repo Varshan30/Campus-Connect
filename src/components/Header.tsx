@@ -56,6 +56,15 @@ const Header = () => {
               <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
             </Button>
             
+            <Link to="/auth">
+              <Button size="sm" className="hidden sm:flex">
+                Login / Sign Up
+              </Button>
+              <Button size="icon" variant="outline" className="sm:hidden">
+                <span className="text-xs font-medium">Log</span>
+              </Button>
+            </Link>
+            
             {/* Mobile menu button */}
             <Button
               variant="ghost"
