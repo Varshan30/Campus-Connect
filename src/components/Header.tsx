@@ -23,7 +23,7 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <span className="font-display text-lg font-semibold text-foreground">
+            <span className="font-display text-lg font-extrabold text-foreground">
               Campus Lost & Found
             </span>
           </Link>
