@@ -26,7 +26,7 @@ const ItemCard = ({ item, onClick, className }: ItemCardProps) => {
   return (
     <Card
       className={cn(
-        'group overflow-hidden card-hover cursor-pointer border-border/50',
+        'group overflow-hidden card-hover cursor-pointer border-border/50 h-full flex flex-col',
         'bg-card card-shadow',
         className
       )}
@@ -56,21 +56,21 @@ const ItemCard = ({ item, onClick, className }: ItemCardProps) => {
         </div>
       </div>
 
-      <CardContent className="p-4">
+      <CardContent className="p-4 flex-1 flex flex-col">
         <h3 className="font-display text-lg font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
           {item.name}
         </h3>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+        <p className="mt-1 text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
           {item.description}
         </p>
         
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-auto pt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
+            <MapPin className="h-3 w-3 flex-shrink-0" />
             {locationLabels[item.location]}
           </span>
           <span className="flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
+            <Calendar className="h-3 w-3 flex-shrink-0" />
             {formatDate(item.dateFound)}
           </span>
         </div>
