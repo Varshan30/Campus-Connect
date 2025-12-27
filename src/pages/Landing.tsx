@@ -107,9 +107,12 @@ const Landing = () => {
       </section>
 
       {/* Categories Section */}
-      <section className="py-16">
+      <section className="py-20 overflow-hidden">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
+          <div className="text-center mb-14">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+              Quick Access
+            </span>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
               Browse by Category
             </h2>
@@ -118,17 +121,34 @@ const Landing = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            {Object.entries(categoryLabels).slice(0, 8).map(([key, label]) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 max-w-4xl mx-auto">
+            {Object.entries(categoryLabels).slice(0, 8).map(([key, label], index) => (
               <Link
                 key={key}
                 to={`/browse?category=${key}`}
-                className="group p-6 rounded-2xl bg-card card-shadow card-hover text-center"
+                className="group relative p-6 rounded-2xl bg-card border border-border/50 text-center overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:-translate-y-1"
+                style={{ animationDelay: `${index * 75}ms` }}
               >
-                <span className="text-4xl mb-3 block">{categoryIcons[key as keyof typeof categoryIcons]}</span>
-                <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {label}
-                </span>
+                {/* Gradient background on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                {/* Animated glow effect */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500" />
+                
+                {/* Icon with bounce animation */}
+                <div className="relative">
+                  <span className="text-5xl mb-4 block transition-transform duration-300 group-hover:scale-110 group-hover:animate-bounce">
+                    {categoryIcons[key as keyof typeof categoryIcons]}
+                  </span>
+                  
+                  {/* Category label */}
+                  <span className="relative font-semibold text-foreground group-hover:text-primary transition-colors duration-300">
+                    {label}
+                  </span>
+                  
+                  {/* Underline animation */}
+                  <span className="block h-0.5 w-0 mx-auto mt-2 bg-primary rounded-full transition-all duration-300 group-hover:w-12" />
+                </div>
               </Link>
             ))}
           </div>
