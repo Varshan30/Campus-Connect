@@ -1,14 +1,31 @@
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Package, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Package, ArrowRight, Smartphone, BookOpen, Shirt, Key, CreditCard, Glasses, Backpack, Box } from 'lucide-react';
 import Layout from '@/components/Layout';
 import TypewriterText from '@/components/TypewriterText';
 import ItemCarousel from '@/components/ItemCarousel';
 import { Button } from '@/components/ui/button';
-import { foundItems, typewriterPhrases, categoryLabels, categoryIcons } from '@/lib/data';
+import { foundItems, typewriterPhrases, categoryLabels, ItemCategory } from '@/lib/data';
+
+const categoryIconComponents: Record<ItemCategory, React.ElementType> = {
+  electronics: Smartphone,
+  books: BookOpen,
+  clothing: Shirt,
+  keys: Key,
+  'id-cards': CreditCard,
+  accessories: Glasses,
+  bags: Backpack,
+  other: Box,
+};
 
 const Landing = () => {
   const availableItems = foundItems.filter((item) => item.status === 'available');
   const recentItems = foundItems.slice(0, 8);
+
+  // Count items per category
+  const categoryItemCounts = foundItems.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + 1;
+    return acc;
+  }, {} as Record<ItemCategory, number>);
 
   const stats = [
     { label: 'Items Returned', value: '1,247', icon: Package },
@@ -122,35 +139,40 @@ const Landing = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 max-w-4xl mx-auto">
-            {Object.entries(categoryLabels).slice(0, 8).map(([key, label], index) => (
-              <Link
-                key={key}
-                to={`/browse?category=${key}`}
-                className="group relative p-6 rounded-2xl bg-card border border-border/50 text-center overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:-translate-y-1"
-                style={{ animationDelay: `${index * 75}ms` }}
-              >
-                {/* Gradient background on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Animated glow effect */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500" />
-                
-                {/* Icon with bounce animation */}
-                <div className="relative">
-                  <span className="text-5xl mb-4 block transition-transform duration-300 group-hover:scale-110 group-hover:animate-bounce">
-                    {categoryIcons[key as keyof typeof categoryIcons]}
-                  </span>
+            {Object.entries(categoryLabels).slice(0, 8).map(([key, label], index) => {
+              const IconComponent = categoryIconComponents[key as ItemCategory];
+              const itemCount = categoryItemCounts[key as ItemCategory] || 0;
+              
+              return (
+                <Link
+                  key={key}
+                  to={`/browse?category=${key}`}
+                  className="group relative p-6 rounded-2xl bg-card border border-border/50 text-center overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:-translate-y-2"
+                  style={{ animationDelay: `${index * 75}ms` }}
+                >
+                  {/* Subtle gradient background */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-secondary/[0.02] group-hover:from-primary/10 group-hover:to-secondary/5 transition-all duration-500" />
                   
-                  {/* Category label */}
-                  <span className="relative font-semibold text-foreground group-hover:text-primary transition-colors duration-300">
-                    {label}
-                  </span>
-                  
-                  {/* Underline animation */}
-                  <span className="block h-0.5 w-0 mx-auto mt-2 bg-primary rounded-full transition-all duration-300 group-hover:w-12" />
-                </div>
-              </Link>
-            ))}
+                  {/* Content */}
+                  <div className="relative">
+                    {/* Icon container with background */}
+                    <div className="mx-auto mb-4 w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary group-hover:shadow-lg group-hover:scale-110">
+                      <IconComponent className="w-7 h-7 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
+                    </div>
+                    
+                    {/* Category label */}
+                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors duration-300 mb-1">
+                      {label}
+                    </h3>
+                    
+                    {/* Item count */}
+                    <span className="text-xs text-muted-foreground">
+                      {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
