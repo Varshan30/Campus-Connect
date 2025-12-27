@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, X } from 'lucide-react';
+import { Search, Filter, X, SlidersHorizontal, MapPin, Tag, CheckCircle2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import ItemCard from '@/components/ItemCard';
 import { Button } from '@/components/ui/button';
@@ -60,11 +60,17 @@ const Browse = () => {
   };
 
   const FilterControls = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-medium text-foreground mb-2 block">Category</label>
+    <div className="space-y-6">
+      {/* Category Filter */}
+      <div className="group">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+            <Tag className="h-4 w-4" />
+          </div>
+          <label className="text-sm font-semibold text-foreground">Category</label>
+        </div>
         <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as ItemCategory | 'all')}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-background/50 border-border/50 hover:border-primary/50 transition-colors">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -76,10 +82,16 @@ const Browse = () => {
         </Select>
       </div>
 
-      <div>
-        <label className="text-sm font-medium text-foreground mb-2 block">Location</label>
+      {/* Location Filter */}
+      <div className="group">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-accent/10 text-accent-foreground">
+            <MapPin className="h-4 w-4" />
+          </div>
+          <label className="text-sm font-semibold text-foreground">Location</label>
+        </div>
         <Select value={selectedLocation} onValueChange={(v) => setSelectedLocation(v as CampusLocation | 'all')}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-background/50 border-border/50 hover:border-primary/50 transition-colors">
             <SelectValue placeholder="All locations" />
           </SelectTrigger>
           <SelectContent>
@@ -91,10 +103,16 @@ const Browse = () => {
         </Select>
       </div>
 
-      <div>
-        <label className="text-sm font-medium text-foreground mb-2 block">Status</label>
+      {/* Status Filter */}
+      <div className="group">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-secondary/50 text-secondary-foreground">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          <label className="text-sm font-semibold text-foreground">Status</label>
+        </div>
         <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v as any)}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-background/50 border-border/50 hover:border-primary/50 transition-colors">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -106,9 +124,17 @@ const Browse = () => {
         </Select>
       </div>
 
+      {/* Divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+      {/* Clear Filters */}
       {activeFiltersCount > 0 && (
-        <Button variant="ghost" onClick={clearFilters} className="w-full">
-          <X className="h-4 w-4 mr-2" />
+        <Button 
+          variant="ghost" 
+          onClick={clearFilters} 
+          className="w-full group/btn hover:bg-destructive/10 hover:text-destructive transition-all"
+        >
+          <X className="h-4 w-4 mr-2 group-hover/btn:rotate-90 transition-transform duration-200" />
           Clear all filters
         </Button>
       )}
@@ -132,10 +158,27 @@ const Browse = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters (Desktop) */}
-          <aside className="hidden lg:block w-64 shrink-0">
-            <div className="sticky top-24 p-6 rounded-2xl bg-card card-shadow">
-              <h3 className="font-display font-semibold text-foreground mb-4">Filters</h3>
-              <FilterControls />
+          <aside className="hidden lg:block w-72 shrink-0">
+            <div className="sticky top-24 rounded-2xl bg-gradient-to-b from-card to-card/80 border border-border/50 shadow-xl shadow-primary/5 overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-b border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <SlidersHorizontal className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-foreground">Filters</h3>
+                    <p className="text-xs text-muted-foreground">Refine your search</p>
+                  </div>
+                  {activeFiltersCount > 0 && (
+                    <Badge className="ml-auto bg-primary text-primary-foreground">{activeFiltersCount}</Badge>
+                  )}
+                </div>
+              </div>
+              {/* Content */}
+              <div className="p-6">
+                <FilterControls />
+              </div>
             </div>
           </aside>
 
