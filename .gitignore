@@ -15,6 +15,9 @@ dist-ssr
 # Firebase
 .firebase/
 
+# Build artifacts
+bun.lockb
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
