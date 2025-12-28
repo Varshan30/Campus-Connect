@@ -10,7 +10,7 @@
 
 **A modern, real-time web application to help students report and find lost & found items on campus.**
 
-🔗 **[Live Demo](https://campus-connect-b8059.web.app)** | 📖 **[Documentation](#features)** | 🐛 **[Report Bug](https://github.com/Varshan30/campus-connect/issues)**
+🔗 **[Live Demo](https://campus-connect-b8059.web.app)**
 
 </div>
 
