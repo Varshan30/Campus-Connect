@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { app } from "../firebase";
 const auth = getAuth(app);
 
 export default function AuthForm() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -23,6 +25,7 @@ export default function AuthForm() {
       if (isLogin) {
         const res = await signInWithEmailAndPassword(auth, email, password);
         setUser(res.user);
+        navigate("/");
       } else {
         const res = await createUserWithEmailAndPassword(auth, email, password);
         // Update user profile with display name
@@ -30,6 +33,7 @@ export default function AuthForm() {
         // Reload user to get updated profile
         await res.user.reload();
         setUser(auth.currentUser);
+        navigate("/");
       }
     } catch (err: any) {
       setError(err.message);
@@ -39,6 +43,7 @@ export default function AuthForm() {
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
+    navigate("/");
   };
 
   return (
