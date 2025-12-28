@@ -1,73 +1,113 @@
-# Welcome to your Lovable project
+# Campus Connect
 
-## Project info
+A modern web application to help students report and find lost & found items on campus.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+🔗 **Live Demo:** [https://campus-connect-b8059.web.app](https://campus-connect-b8059.web.app)
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+### 🔐 Authentication
+- Email/password login and signup
+- User profile management with display name
+- Secure Firebase Authentication
 
-**Use Lovable**
+### 📦 Lost & Found Management
+- Report lost or found items with details (name, description, category, location, contact)
+- Browse all items with real-time updates
+- Search items by name, description, or category
+- Filter by item type (Lost/Found)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### ✏️ Item Management
+- Edit your own reported items
+- Delete your own items
+- Only item creators can modify their listings (authorization)
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🤝 Claim System
+- Claim found items with a message
+- Item owners receive claim notifications
+- Approve or reject claims
+- Real-time status updates
 
-**Use your preferred IDE**
+### 🔔 Notifications
+- Real-time notification bell with unread count
+- Telegram bot notifications for all events
+- Email notifications for claims (via Formspree)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🔄 Auto-Matching
+- Automatic matching between lost and found items
+- Similarity scoring based on name, description, and category
+- Notifications sent when potential matches are found
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 🎨 Modern UI
+- Animated gradient buttons
+- Animated grid pattern backgrounds
+- Smooth hover effects and transitions
+- Responsive design for all devices
+- Dark theme with gradient accents
 
-Follow these steps:
+## Tech Stack
+
+- **Frontend:** React 18, TypeScript, Vite
+- **Styling:** Tailwind CSS, shadcn/ui
+- **Animations:** Framer Motion
+- **Backend:** Firebase (Authentication, Firestore)
+- **Hosting:** Firebase Hosting
+- **Notifications:** Telegram Bot API, Formspree
+
+## Getting Started
+
+### Prerequisites
+- Node.js & npm installed
+
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone https://github.com/Varshan30/campus-connect.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd campus-connect
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Build for Production
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run build
+```
 
-**Use GitHub Codespaces**
+### Deploy to Firebase
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+firebase deploy --only hosting
+```
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+```
+src/
+├── components/     # Reusable UI components
+│   ├── ui/         # Base UI components (buttons, dialogs, etc.)
+│   ├── Header.tsx  # Navigation header with notifications
+│   ├── Footer.tsx  # App footer
+│   └── ...
+├── pages/          # Page components
+│   ├── Landing.tsx # Home page with recent items
+│   ├── Browse.tsx  # Browse all items
+│   ├── ReportItem.tsx # Report lost/found items
+│   ├── Settings.tsx # User settings
+│   └── Auth.tsx    # Login/Signup page
+├── lib/            # Utility functions
+│   ├── matching.ts # Auto-matching algorithm
+│   └── notifications.ts # Telegram & email notifications
+└── firebase.js     # Firebase configuration
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## License
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This project is open source and available under the MIT License.
