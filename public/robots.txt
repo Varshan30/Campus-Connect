@@ -1,3 +1,4 @@
+# Campus Connect - robots.txt
 User-agent: Googlebot
 Allow: /
 
@@ -12,3 +13,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://campus-connect-b8059.web.app/sitemap.xml

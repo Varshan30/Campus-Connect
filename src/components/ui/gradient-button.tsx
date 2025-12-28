@@ -1,3 +1,4 @@
+// Campus Connect UI Component
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -210,3 +211,4 @@ export function GradientLinkButton({
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+// Campus Connect UI Component
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -144,3 +145,4 @@ export function AnimatedGridPattern({
     </svg>
   );
 }
+
