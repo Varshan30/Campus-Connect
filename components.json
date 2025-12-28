@@ -1,5 +1,6 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
+  "name": "campus-connect",
   "style": "default",
   "rsc": false,
   "tsx": true,
