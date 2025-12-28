@@ -28,7 +28,7 @@ const ItemCarousel = ({ items, title, onItemClick }: ItemCarouselProps) => {
     checkScrollPosition();
     window.addEventListener('resize', checkScrollPosition);
     return () => window.removeEventListener('resize', checkScrollPosition);
-  }, []);
+  }, [items]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {

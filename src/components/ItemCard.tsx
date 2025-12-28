@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { GradientButton } from '@/components/ui/gradient-button';
 import { MapPin, Calendar } from 'lucide-react';
 import { FoundItem, categoryIcons, locationLabels } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import ClaimDialog from './ClaimDialog';
@@ -11,9 +12,12 @@ interface ItemCardProps {
   item: FoundItem;
   onClick?: () => void;
   className?: string;
+  onDelete?: (id: string) => void;
+  onEdit?: (item: FoundItem) => void;
+  onClaimSubmitted?: (itemId: string) => void;
 }
 
-const ItemCard = ({ item, onClick, className }: ItemCardProps) => {
+const ItemCard = ({ item, onClick, className, onDelete, onEdit, onClaimSubmitted }: ItemCardProps) => {
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
 
   const statusColors = {
@@ -88,18 +92,34 @@ const ItemCard = ({ item, onClick, className }: ItemCardProps) => {
           </div>
         </CardContent>
 
-        <CardFooter className="p-4 pt-0">
-          <Button
-            size="sm"
-            className="w-full"
-            variant={item.status === 'available' ? 'default' : 'secondary'}
-            disabled={item.status === 'claimed'}
-            onClick={handleClaimClick}
-          >
-            {item.status === 'available' && 'Claim Item'}
-            {item.status === 'pending' && 'Pending Claim'}
-            {item.status === 'claimed' && 'Already Claimed'}
-          </Button>
+        <CardFooter className="p-4 pt-0 flex flex-col gap-2">
+          {item.status === 'available' ? (
+            <GradientButton
+              size="sm"
+              className="w-full"
+              onClick={handleClaimClick}
+            >
+              Claim Item
+            </GradientButton>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full rounded-full"
+              variant="secondary"
+              disabled={item.status === 'claimed'}
+            >
+              {item.status === 'pending' && 'Pending Claim'}
+              {item.status === 'claimed' && 'Already Claimed'}
+            </Button>
+          )}
+          <div className="flex gap-2 mt-2 w-full">
+            {onEdit && (
+              <Button size="sm" variant="outline" className="flex-1 rounded-full" onClick={e => { e.stopPropagation(); onEdit(item); }}>Edit</Button>
+            )}
+            {onDelete && (
+              <Button size="sm" variant="destructive" className="flex-1 rounded-full" onClick={e => { e.stopPropagation(); onDelete(item.id); }}>Delete</Button>
+            )}
+          </div>
         </CardFooter>
       </Card>
 
@@ -107,6 +127,7 @@ const ItemCard = ({ item, onClick, className }: ItemCardProps) => {
         item={item}
         open={claimDialogOpen}
         onOpenChange={setClaimDialogOpen}
+        onClaimSubmitted={onClaimSubmitted}
       />
     </>
   );

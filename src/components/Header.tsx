@@ -1,12 +1,89 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Search, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GradientButton } from '@/components/ui/gradient-button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { app, db } from '../firebase';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+const auth = getAuth(app);
+
+interface Notification {
+  id: string;
+  message: string;
+  read: boolean;
+  createdAt: any;
+  userId: string;
+}
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState(auth.currentUser);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch notifications for logged in user
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Notification[];
+      setNotifications(notifs);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setUser(null);
+    navigate('/');
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/browse?search=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSearch(false);
+      setSearchQuery('');
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -48,22 +125,98 @@ const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="hidden md:flex">
-              <Search className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
-            </Button>
+            {/* Search */}
+            <Popover open={showSearch} onOpenChange={setShowSearch}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="hidden md:flex">
+                  <Search className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-2" align="end">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search items..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  <GradientButton type="submit" size="sm">Search</GradientButton>
+                </form>
+              </PopoverContent>
+            </Popover>
+
+            {/* Notifications */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-3 border-b border-border">
+                  <h4 className="font-semibold text-sm">Notifications</h4>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "p-3 border-b border-border/50 text-sm cursor-pointer hover:bg-muted/50",
+                          !notification.read && "bg-primary/5"
+                        )}
+                        onClick={() => !notification.read && markAsRead(notification.id)}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!notification.read && (
+                            <span className="h-2 w-2 mt-1.5 rounded-full bg-primary flex-shrink-0" />
+                          )}
+                          <span className={cn(!notification.read && "font-medium")}>
+                            {notification.message}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             
-            <Link to="/auth">
-              <Button size="sm" className="hidden sm:flex">
-                Login / Sign Up
+            {/* User info and Logout */}
+            {user ? (
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {user.displayName || user.email?.split('@')[0]}
+                </span>
+                <GradientButton size="sm" onClick={handleLogout}>
+                  Logout
+                </GradientButton>
+              </div>
+            ) : (
+              <Link to="/auth">
+                <GradientButton size="sm" className="hidden sm:flex">
+                  Login / Sign Up
+                </GradientButton>
+              </Link>
+            )}
+            {user ? (
+              <Button size="icon" variant="outline" className="sm:hidden" onClick={handleLogout}>
+                <span className="text-xs font-medium">Out</span>
               </Button>
-              <Button size="icon" variant="outline" className="sm:hidden">
-                <span className="text-xs font-medium">Log</span>
-              </Button>
-            </Link>
+            ) : (
+              <Link to="/auth">
+                <Button size="icon" variant="outline" className="sm:hidden">
+                  <span className="text-xs font-medium">Log</span>
+                </Button>
+              </Link>
+            )}
             
             {/* Mobile menu button */}
             <Button

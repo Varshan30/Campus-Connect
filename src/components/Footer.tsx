@@ -12,7 +12,7 @@ const Footer = () => {
               Campus Lost & Found
             </h3>
             <p className="text-sm text-muted-foreground">
-              Helping students reconnect with their belongings since 2024.
+              Helping students reconnect with their belongings since 2025.
             </p>
           </div>
 
@@ -51,7 +51,7 @@ const Footer = () => {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <MapPin className="h-3.5 w-3.5 text-primary" />
-                  Student Center, Room 101
+                  Student Care Center, Room  TP 101
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5 text-primary" />
@@ -59,7 +59,7 @@ const Footer = () => {
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5 text-primary" />
-                  (555) 123-4567
+                  +91 9876543210
                 </li>
               </ul>
             </div>

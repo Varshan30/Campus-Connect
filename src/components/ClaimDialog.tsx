@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { FoundItem, locationLabels } from '@/lib/data';
+import { FoundItem, locationLabels, categoryLabels } from '@/lib/data';
+import { notifyAll } from '@/lib/notifications';
 import {
   Dialog,
   DialogContent,
@@ -8,22 +9,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { GradientButton } from '@/components/ui/gradient-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, Package } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 interface ClaimDialogProps {
   item: FoundItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onClaimSubmitted?: (itemId: string) => void;
 }
 
-const ClaimDialog = ({ item, open, onOpenChange }: ClaimDialogProps) => {
+const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialogProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const auth = getAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -43,25 +50,79 @@ const ClaimDialog = ({ item, open, onOpenChange }: ClaimDialogProps) => {
       return;
     }
 
+    if (!item) return;
+
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    
-    toast({
-      title: 'Claim submitted!',
-      description: 'We will contact you shortly to verify your claim.',
-    });
+    try {
+      // Save claim to Firestore
+      await addDoc(collection(db, 'claims'), {
+        itemId: item.id,
+        itemName: item.name,
+        claimerName: formData.name,
+        claimerEmail: formData.email,
+        claimerPhone: formData.phone,
+        identificationDescription: formData.description,
+        claimedAt: new Date().toISOString(),
+        status: 'pending',
+        userId: auth.currentUser?.uid || null,
+      });
 
-    // Reset after showing success
-    setTimeout(() => {
-      setIsSuccess(false);
-      setFormData({ name: '', email: '', phone: '', description: '' });
-      onOpenChange(false);
-    }, 2000);
+      // Update item status to pending
+      await updateDoc(doc(db, 'foundItems', item.id), {
+        status: 'pending',
+      });
+
+      // Create notification
+      await addDoc(collection(db, 'notifications'), {
+        type: 'claim',
+        message: `New claim submitted for "${item.name}" by ${formData.name}`,
+        itemId: item.id,
+        userId: auth.currentUser?.uid || null,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Send email/Telegram notification via Formspree
+      await notifyAll({
+        type: 'claim',
+        itemName: item.name,
+        itemCategory: categoryLabels[item.category] || item.category,
+        itemLocation: locationLabels[item.location] || item.location,
+        userName: formData.name,
+        userEmail: formData.email,
+        userPhone: formData.phone,
+        description: formData.description,
+        timestamp: new Date().toLocaleString(),
+      });
+
+      setIsSuccess(true);
+      
+      toast({
+        title: 'Claim submitted!',
+        description: 'We will contact you shortly to verify your claim.',
+      });
+
+      // Notify parent component
+      if (onClaimSubmitted) {
+        onClaimSubmitted(item.id);
+      }
+
+      // Reset after showing success
+      setTimeout(() => {
+        setIsSuccess(false);
+        setFormData({ name: '', email: '', phone: '', description: '' });
+        onOpenChange(false);
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: 'Submission failed',
+        description: 'There was an error submitting your claim. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!item) return null;
@@ -120,7 +181,7 @@ const ClaimDialog = ({ item, open, onOpenChange }: ClaimDialogProps) => {
                 <Input
                   id="phone"
                   type="tel"
-                  placeholder="(555) 123-4567"
+                  placeholder="+91 9876543210"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
@@ -146,9 +207,9 @@ const ClaimDialog = ({ item, open, onOpenChange }: ClaimDialogProps) => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                <GradientButton type="submit" className="flex-1" disabled={isSubmitting}>
                   {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-                </Button>
+                </GradientButton>
               </div>
             </form>
           </>

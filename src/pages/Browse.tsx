@@ -1,10 +1,18 @@
-import { useState, useMemo } from 'react';
-import { Search, Filter, X, SlidersHorizontal, MapPin, Tag, CheckCircle2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { db, app } from '../firebase';
+import { collection, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+import { Search, Filter, X, SlidersHorizontal, MapPin, Tag, CheckCircle2, Loader2, Package, TrendingUp } from 'lucide-react';
 import Layout from '@/components/Layout';
 import ItemCard from '@/components/ItemCard';
+import EditItemDialog from '@/components/EditItemDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -20,31 +28,88 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import {
-  foundItems,
   categoryLabels,
   locationLabels,
   ItemCategory,
   CampusLocation,
 } from '@/lib/data';
 
+const auth = getAuth(app);
+
 const Browse = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState<ItemCategory | 'all'>('all');
   const [selectedLocation, setSelectedLocation] = useState<CampusLocation | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'available' | 'pending' | 'claimed'>('all');
+  const [items, setItems] = useState<any[]>([]);
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for items
+  useEffect(() => {
+    const q = query(collection(db, 'foundItems'), orderBy('dateFound', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setItems(fetchedItems);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Update search query when URL changes
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || '';
+    if (urlSearch) {
+      setSearchQuery(urlSearch);
+    }
+  }, [searchParams]);
+
+  // Delete item handler
+  const handleDelete = async (id: string) => {
+    await deleteDoc(doc(db, 'foundItems', id));
+    setItems(items => items.filter(item => item.id !== id));
+  };
+
+  // Edit item handler - opens dialog
+  const handleEdit = (item: any) => {
+    setEditItem(item);
+  };
+
+  // Handler for when item is updated
+  const handleItemUpdated = (updatedItem: any) => {
+    setItems(items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+    setEditItem(null);
+  };
+
+  // Handler for when item is claimed
+  const handleClaimSubmitted = (itemId: string) => {
+    setItems(items => items.map(i => i.id === itemId ? { ...i, status: 'pending' } : i));
+  };
 
   const filteredItems = useMemo(() => {
-    return foundItems.filter((item) => {
+    return items.filter((item) => {
       const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
+        item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
       const matchesLocation = selectedLocation === 'all' || item.location === selectedLocation;
       const matchesStatus = selectedStatus === 'all' || item.status === selectedStatus;
-
       return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
     });
-  }, [searchQuery, selectedCategory, selectedLocation, selectedStatus]);
+  }, [items, searchQuery, selectedCategory, selectedLocation, selectedStatus]);
 
   const activeFiltersCount = [
     selectedCategory !== 'all',
@@ -143,15 +208,62 @@ const Browse = () => {
 
   return (
     <Layout>
-      {/* Header */}
-      <section className="bg-gradient-to-b from-muted/50 to-background py-12">
-        <div className="container mx-auto px-4">
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
-            Browse Found Items
-          </h1>
-          <p className="text-muted-foreground">
-            {filteredItems.length} items found
-          </p>
+      {/* Header with Stats */}
+      <section className="bg-gradient-to-b from-muted/50 to-background py-12 relative overflow-hidden">
+        <AnimatedGridPattern
+          numSquares={20}
+          maxOpacity={0.02}
+          duration={4}
+          className={cn(
+            "[mask-image:radial-gradient(400px_circle_at_center,white,transparent)]",
+          )}
+        />
+        <div className="container mx-auto px-4 relative">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col md:flex-row md:items-center md:justify-between gap-6"
+          >
+            <div>
+              <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
+                Browse Found Items
+              </h1>
+              <p className="text-muted-foreground">
+                {loading ? 'Loading...' : `${filteredItems.length} items found`}
+              </p>
+            </div>
+            
+            {/* Quick Stats */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex gap-4"
+            >
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <motion.span 
+                  key={items.filter(i => i.status === 'available').length}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  className="text-sm font-medium text-green-600 dark:text-green-400"
+                >
+                  {items.filter(i => i.status === 'available').length} Available
+                </motion.span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                <Package className="h-4 w-4 text-yellow-500" />
+                <motion.span 
+                  key={items.filter(i => i.status === 'pending').length}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  className="text-sm font-medium text-yellow-600 dark:text-yellow-400"
+                >
+                  {items.filter(i => i.status === 'pending').length} Pending
+                </motion.span>
+              </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
@@ -208,7 +320,7 @@ const Browse = () => {
                     )}
                   </Button>
                 </SheetTrigger>
-                <SheetContent>
+                <SheetContent side="right">
                   <SheetHeader>
                     <SheetTitle>Filters</SheetTitle>
                   </SheetHeader>
@@ -253,14 +365,40 @@ const Browse = () => {
             )}
 
             {/* Items Grid */}
-            {filteredItems.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredItems.map((item) => (
-                  <ItemCard key={item.id} item={item} />
-                ))}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+                <p className="text-muted-foreground">Loading items...</p>
               </div>
+            ) : filteredItems.length > 0 ? (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6"
+              >
+                {filteredItems.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05, duration: 0.3 }}
+                    layout
+                  >
+                    <ItemCard 
+                      item={item} 
+                      onDelete={currentUser && item.createdBy === currentUser.uid ? handleDelete : undefined} 
+                      onEdit={currentUser && item.createdBy === currentUser.uid ? handleEdit : undefined} 
+                      onClaimSubmitted={handleClaimSubmitted}
+                    />
+                  </motion.div>
+                ))}
+              </motion.div>
             ) : (
-              <div className="text-center py-16">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-16"
+              >
                 <div className="text-6xl mb-4">🔍</div>
                 <h3 className="font-display text-xl font-semibold text-foreground mb-2">
                   No items found
@@ -271,11 +409,21 @@ const Browse = () => {
                 <Button variant="outline" onClick={clearFilters}>
                   Clear all filters
                 </Button>
-              </div>
+              </motion.div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Item Dialog */}
+      {editItem && (
+        <EditItemDialog
+          item={editItem}
+          open={!!editItem}
+          onOpenChange={(open) => !open && setEditItem(null)}
+          onItemUpdated={handleItemUpdated}
+        />
+      )}
     </Layout>
   );
 };

@@ -1,10 +1,30 @@
-import { useState } from 'react';
-import { Moon, Sun, Bell, Mail, Smartphone, Shield, Settings as SettingsIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Moon, Sun, Bell, Mail, Smartphone, Shield, Settings as SettingsIcon, User, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import CinematicToggle from '@/components/CinematicToggle';
+import { Button } from '@/components/ui/button';
+import { GradientButton } from '@/components/ui/gradient-button';
+import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { getAuth, onAuthStateChanged, signOut, updateProfile, updateEmail } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { app, db } from '../firebase';
+
+const auth = getAuth(app);
 
 const Settings = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState(auth.currentUser);
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   const [settings, setSettings] = useState({
     darkMode: false,
     emailNotifications: true,
@@ -14,18 +34,133 @@ const Settings = () => {
     twoFactorAuth: false,
   });
 
-  const updateSetting = (key: keyof typeof settings, value: boolean) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setDisplayName(currentUser.displayName || '');
+        setEmail(currentUser.email || '');
+        
+        // Load user settings from Firestore
+        const settingsDoc = await getDoc(doc(db, 'userSettings', currentUser.uid));
+        if (settingsDoc.exists()) {
+          const data = settingsDoc.data();
+          setSettings(prev => ({ ...prev, ...data.preferences }));
+          setPhone(data.phone || '');
+          if (data.preferences?.darkMode) {
+            document.documentElement.classList.add('dark');
+          }
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const updateSetting = async (key: keyof typeof settings, value: boolean) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
     
     if (key === 'darkMode') {
       document.documentElement.classList.toggle('dark', value);
     }
+
+    // Save to Firestore
+    if (user) {
+      try {
+        await setDoc(doc(db, 'userSettings', user.uid), {
+          preferences: newSettings,
+          phone,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+
+        // Show confirmation for each setting
+        const messages: Record<string, string> = {
+          darkMode: value ? 'Dark mode enabled' : 'Light mode enabled',
+          emailNotifications: value ? 'Email notifications enabled' : 'Email notifications disabled',
+          pushNotifications: value ? 'Push notifications enabled' : 'Push notifications disabled',
+          matchAlerts: value ? 'Match alerts enabled - you\'ll be notified when your item is found' : 'Match alerts disabled',
+          weeklyDigest: value ? 'Weekly digest enabled - you\'ll receive a summary every week' : 'Weekly digest disabled',
+          twoFactorAuth: value ? 'Two-factor authentication enabled for extra security' : 'Two-factor authentication disabled',
+        };
+
+        toast({
+          title: messages[key] || 'Setting updated',
+          description: 'Your preference has been saved.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Failed to save',
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+    }
   };
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsUpdating(true);
+    
+    try {
+      await updateProfile(user, { displayName });
+      
+      // Save phone to Firestore
+      await setDoc(doc(db, 'userSettings', user.uid), {
+        phone,
+        preferences: settings,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      toast({
+        title: 'Profile updated',
+        description: 'Your profile has been saved.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate('/');
+    toast({
+      title: 'Logged out',
+      description: 'You have been signed out.',
+    });
+  };
+
+  if (!user) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">Please log in to access settings</h2>
+            <GradientButton onClick={() => navigate('/auth')}>Go to Login</GradientButton>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background">
-        <div className="container mx-auto px-4 py-12 max-w-xl">
+      <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
+        <AnimatedGridPattern
+          numSquares={30}
+          maxOpacity={0.02}
+          duration={4}
+          className={cn(
+            "[mask-image:radial-gradient(500px_circle_at_center,white,transparent)]",
+            "inset-x-0 inset-y-0 h-full"
+          )}
+        />
+        <div className="container mx-auto px-4 py-12 max-w-xl relative z-10">
           {/* Header */}
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
@@ -53,95 +188,63 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Notifications Section */}
+            {/* Profile Section */}
             <div className="rounded-xl bg-card border border-border/50 overflow-hidden">
               <div className="px-4 py-3 bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notifications</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Profile</p>
               </div>
-              <div className="divide-y divide-border/50">
-                <div className="p-4">
-                  <SettingRow
-                    icon={<Mail className="h-5 w-5" />}
-                    label="Email"
-                    description="Receive via email"
-                    checked={settings.emailNotifications}
-                    onChange={(v) => updateSetting('emailNotifications', v)}
+              <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Your name"
                   />
                 </div>
-                <div className="p-4">
-                  <SettingRow
-                    icon={<Bell className="h-5 w-5" />}
-                    label="Push"
-                    description="Device notifications"
-                    checked={settings.pushNotifications}
-                    onChange={(v) => updateSetting('pushNotifications', v)}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={email}
+                    disabled
+                    className="bg-muted/50"
+                  />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 9876543210"
                   />
                 </div>
-                <div className="p-4">
-                  <SettingRow
-                    icon={<Bell className="h-5 w-5" />}
-                    label="Match Alerts"
-                    description="When item found"
-                    checked={settings.matchAlerts}
-                    onChange={(v) => updateSetting('matchAlerts', v)}
-                  />
-                </div>
-                <div className="p-4">
-                  <SettingRow
-                    icon={<Mail className="h-5 w-5" />}
-                    label="Weekly Digest"
-                    description="Summary of items"
-                    checked={settings.weeklyDigest}
-                    onChange={(v) => updateSetting('weeklyDigest', v)}
-                  />
-                </div>
+                <GradientButton 
+                  onClick={handleUpdateProfile} 
+                  disabled={isUpdating}
+                  className="w-full"
+                >
+                  {isUpdating ? 'Saving...' : 'Save Profile'}
+                </GradientButton>
               </div>
             </div>
 
-            {/* Security Section */}
+            {/* Account Actions */}
             <div className="rounded-xl bg-card border border-border/50 overflow-hidden">
               <div className="px-4 py-3 bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Security</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account</p>
               </div>
               <div className="p-4">
-                <SettingRow
-                  icon={<Shield className="h-5 w-5" />}
-                  label="Two-Factor Auth"
-                  description="Extra security"
-                  checked={settings.twoFactorAuth}
-                  onChange={(v) => updateSetting('twoFactorAuth', v)}
-                />
-              </div>
-            </div>
-
-            {/* Contact Info */}
-            <div className="rounded-xl bg-card border border-border/50 overflow-hidden">
-              <div className="px-4 py-3 bg-muted/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</p>
-              </div>
-              <div className="divide-y divide-border/50">
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted/50">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Email</p>
-                      <p className="text-xs text-muted-foreground">student@campus.edu</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted/50">
-                      <Smartphone className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Phone</p>
-                      <p className="text-xs text-muted-foreground">Not set</p>
-                    </div>
-                  </div>
-                </div>
+                <GradientButton 
+                  onClick={handleLogout}
+                  className="w-full"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </GradientButton>
               </div>
             </div>
           </div>

@@ -1,8 +1,14 @@
 import { useState } from 'react';
-import { Upload, X, Send } from 'lucide-react';
+import { db, app } from '../firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { Upload, X, Send, Lightbulb, CheckCircle, AlertCircle } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
+import { GradientButton } from '@/components/ui/gradient-button';
+import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
@@ -16,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { categoryLabels, locationLabels, ItemCategory, CampusLocation } from '@/lib/data';
+import { notifyAll } from '@/lib/notifications';
+import { runAutoMatching } from '@/lib/matching';
 
 const ReportItem = () => {
   const { toast } = useToast();
@@ -48,9 +56,8 @@ const ReportItem = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     // Validation
     if (!formData.name || !formData.category || !formData.location || !formData.date) {
       toast({
@@ -61,29 +68,85 @@ const ReportItem = () => {
       return;
     }
 
-    toast({
-      title: 'Report submitted!',
-      description: `Your ${reportType} item report has been submitted successfully.`,
-    });
+    // Prepare item data
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    
+    const itemData = {
+      ...formData,
+      dateFound: reportType === 'found' ? formData.date : '',
+      dateLost: reportType === 'lost' ? formData.date : '',
+      image: imagePreview || '',
+      status: 'available',
+      type: reportType,
+      createdAt: new Date().toISOString(),
+      createdBy: user?.uid || null,
+      createdByEmail: user?.email || null,
+    };
 
-    // Reset form
-    setFormData({
-      name: '',
-      category: '',
-      location: '',
-      date: '',
-      description: '',
-      contactEmail: '',
-      contactPhone: '',
-    });
-    setImagePreview(null);
+    try {
+      const docRef = await addDoc(collection(db, 'foundItems'), itemData);
+      
+      // Run auto-matching to find similar items
+      const matches = await runAutoMatching(
+        { ...itemData, id: docRef.id, type: reportType },
+        user?.uid || null
+      );
+      
+      // Send email/Telegram notification via Formspree
+      await notifyAll({
+        type: 'new_item',
+        itemName: formData.name,
+        itemCategory: categoryLabels[formData.category as ItemCategory] || formData.category,
+        itemLocation: locationLabels[formData.location as CampusLocation] || formData.location,
+        userEmail: formData.contactEmail,
+        userPhone: formData.contactPhone,
+        description: formData.description,
+        timestamp: new Date().toLocaleString(),
+      });
+      
+      // Show success with match info
+      const matchMessage = matches.length > 0 
+        ? ` We found ${matches.length} potential match${matches.length > 1 ? 'es' : ''}! Check your notifications.`
+        : '';
+      
+      toast({
+        title: 'Report submitted!',
+        description: `Your ${reportType} item report has been submitted successfully.${matchMessage}`,
+      });
+      // Reset form
+      setFormData({
+        name: '',
+        category: '',
+        location: '',
+        date: '',
+        description: '',
+        contactEmail: '',
+        contactPhone: '',
+      });
+      setImagePreview(null);
+    } catch (error) {
+      toast({
+        title: 'Submission failed',
+        description: 'There was an error submitting your report. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
     <Layout>
       {/* Header */}
-      <section className="bg-gradient-to-b from-muted/50 to-background py-12">
-        <div className="container mx-auto px-4">
+      <section className="bg-gradient-to-b from-muted/50 to-background py-12 relative overflow-hidden">
+        <AnimatedGridPattern
+          numSquares={30}
+          maxOpacity={0.02}
+          duration={4}
+          className={cn(
+            "[mask-image:radial-gradient(500px_circle_at_center,white,transparent)]",
+          )}
+        />
+        <div className="container mx-auto px-4 relative z-10">
           <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
             Report an Item
           </h1>
@@ -93,7 +156,33 @@ const ReportItem = () => {
         </div>
       </section>
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        {/* Tips Section */}
+        <div className="mb-8 p-4 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Lightbulb className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground mb-2">Tips for a successful report</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Be as specific as possible with item descriptions
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Include unique identifiers (color, brand, stickers, etc.)
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Add a photo if possible - it helps with identification
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         <Tabs value={reportType} onValueChange={(v) => setReportType(v as 'lost' | 'found')}>
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="lost">I Lost Something</TabsTrigger>
@@ -120,10 +209,12 @@ const ReportItem = () => {
                     dateLabel="Date Lost"
                     locationLabel="Where did you last see it?"
                   />
-                  <Button type="submit" className="w-full" size="lg">
-                    <Send className="h-5 w-5 mr-2" />
-                    Submit Lost Item Report
-                  </Button>
+                  <div className="flex justify-center">
+                    <GradientButton type="submit" size="lg">
+                      <Send className="h-5 w-5" />
+                      Submit Lost Item Report
+                    </GradientButton>
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -149,10 +240,12 @@ const ReportItem = () => {
                     dateLabel="Date Found"
                     locationLabel="Where did you find it?"
                   />
-                  <Button type="submit" className="w-full" size="lg">
-                    <Send className="h-5 w-5 mr-2" />
-                    Submit Found Item Report
-                  </Button>
+                  <div className="flex justify-center">
+                    <GradientButton type="submit" size="lg">
+                      <Send className="h-5 w-5" />
+                      Submit Found Item Report
+                    </GradientButton>
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -330,7 +423,7 @@ const FormFields = ({
             type="tel"
             value={formData.contactPhone}
             onChange={handleInputChange}
-            placeholder="(555) 123-4567"
+            placeholder="+91 9876543210"
           />
         </div>
       </div>
