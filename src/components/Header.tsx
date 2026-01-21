@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, Bell } from 'lucide-react';
+import { Menu, X, Search, Bell, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GradientButton } from '@/components/ui/gradient-button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,9 @@ import {
 
 const auth = getAuth(app);
 
+// Admin emails - in production, store this in Firestore or environment
+const ADMIN_EMAILS = ['admin@campus.edu', 'admin@university.edu', 'test@test.com'];
+
 interface Notification {
   id: string;
   message: string;
@@ -27,6 +30,7 @@ interface Notification {
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState(auth.currentUser);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -36,6 +40,12 @@ const Header = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      // Check if user is admin
+      if (currentUser) {
+        setIsAdmin(ADMIN_EMAILS.includes(currentUser.email || ''));
+      } else {
+        setIsAdmin(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -90,6 +100,7 @@ const Header = () => {
     { href: '/browse', label: 'Browse Items' },
     { href: '/report', label: 'Report Item' },
     { href: '/settings', label: 'Settings' },
+    ...(isAdmin ? [{ href: '/admin/claims', label: 'Admin', icon: Shield }] : []),
   ];
 
   const isActive = (href: string) => location.pathname === href;

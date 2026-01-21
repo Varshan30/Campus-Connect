@@ -15,11 +15,13 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
     }
     
-    // Claims - authenticated users can create and read
+    // Claims - authenticated users can create and read, admins can update
     match /claims/{claimId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Allow claim owner or any authenticated user to update (for admin approval)
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
     // Notifications - users can read their own, anyone can create

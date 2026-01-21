@@ -1,6 +1,7 @@
 // Automatic matching service for lost and found items
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { FoundItem, ItemCategory } from './data';
 
 interface ItemData {
   name: string;
@@ -17,6 +18,19 @@ interface MatchResult {
   itemName: string;
   matchScore: number;
   matchReasons: string[];
+}
+
+interface ClaimMatchScore {
+  score: number;
+  maxScore: number;
+  percentage: number;
+  breakdown: {
+    category: string;
+    points: number;
+    maxPoints: number;
+    details: string;
+  }[];
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
 // Calculate similarity between two strings (simple word matching)
@@ -36,6 +50,122 @@ function calculateSimilarity(str1: string, str2: string): number {
   }
   
   return matches / Math.max(words1.length, words2.length);
+}
+
+// Calculate match score for a claim against item details
+export function calculateMatchScore(
+  item: FoundItem,
+  securityAnswers: Record<string, string>,
+  claimerDescription: string
+): ClaimMatchScore {
+  const breakdown: ClaimMatchScore['breakdown'] = [];
+  let totalScore = 0;
+  let maxScore = 0;
+
+  // Check color-related answers (all categories usually have color)
+  const colorAnswerKeys = ['color', 'caseColor', 'clothingColor', 'bagColor', 'accessoryColor', 'itemColor', 'bookColor'];
+  const colorAnswer = colorAnswerKeys.find(key => securityAnswers[key]);
+  if (colorAnswer && securityAnswers[colorAnswer]) {
+    maxScore += 25;
+    const colorMatch = calculateSimilarity(
+      item.description.toLowerCase(),
+      securityAnswers[colorAnswer].toLowerCase()
+    );
+    const colorPoints = Math.round(colorMatch * 25);
+    totalScore += colorPoints;
+    breakdown.push({
+      category: 'Color Match',
+      points: colorPoints,
+      maxPoints: 25,
+      details: colorPoints > 15 ? 'Color description matches well' : colorPoints > 5 ? 'Partial color match' : 'Color did not match'
+    });
+  }
+
+  // Check description match
+  if (claimerDescription) {
+    maxScore += 30;
+    const descMatch = calculateSimilarity(item.description, claimerDescription);
+    const descPoints = Math.round(descMatch * 30);
+    totalScore += descPoints;
+    breakdown.push({
+      category: 'Description Match',
+      points: descPoints,
+      maxPoints: 30,
+      details: descPoints > 20 ? 'Detailed description matches' : descPoints > 10 ? 'Some details match' : 'Description differs'
+    });
+  }
+
+  // Check brand (if applicable)
+  const brandAnswerKeys = ['clothingBrand', 'bagBrand', 'accessoryBrand'];
+  const brandAnswer = brandAnswerKeys.find(key => securityAnswers[key]);
+  if (brandAnswer && securityAnswers[brandAnswer]) {
+    maxScore += 20;
+    const brandLower = securityAnswers[brandAnswer].toLowerCase();
+    const descLower = item.description.toLowerCase();
+    const brandInDesc = descLower.includes(brandLower) || brandLower.split(/\s+/).some(b => descLower.includes(b));
+    const brandPoints = brandInDesc ? 20 : 0;
+    totalScore += brandPoints;
+    breakdown.push({
+      category: 'Brand Verification',
+      points: brandPoints,
+      maxPoints: 20,
+      details: brandInDesc ? 'Brand matches' : 'Brand not verified'
+    });
+  }
+
+  // Check unique features/damage
+  const featureAnswerKeys = ['damage', 'uniqueFeature', 'accessoryFeature', 'itemFeature', 'bookMarks'];
+  const featureAnswer = featureAnswerKeys.find(key => securityAnswers[key]);
+  if (featureAnswer && securityAnswers[featureAnswer]) {
+    maxScore += 25;
+    const featureMatch = calculateSimilarity(
+      item.description.toLowerCase(),
+      securityAnswers[featureAnswer].toLowerCase()
+    );
+    const featurePoints = Math.round(featureMatch * 25);
+    totalScore += featurePoints;
+    breakdown.push({
+      category: 'Unique Features',
+      points: featurePoints,
+      maxPoints: 25,
+      details: featurePoints > 15 ? 'Unique features verified' : featurePoints > 5 ? 'Some features match' : 'Features unclear'
+    });
+  }
+
+  // Number of security questions answered (engagement score)
+  const answeredCount = Object.values(securityAnswers).filter(a => a.trim() !== '').length;
+  maxScore += 20;
+  const engagementPoints = Math.min(answeredCount * 5, 20);
+  totalScore += engagementPoints;
+  breakdown.push({
+    category: 'Verification Effort',
+    points: engagementPoints,
+    maxPoints: 20,
+    details: `${answeredCount} security questions answered`
+  });
+
+  // Ensure maxScore is at least 100 for percentage calculation
+  if (maxScore < 100) maxScore = 100;
+
+  const percentage = Math.round((totalScore / maxScore) * 100);
+  
+  // Determine risk level
+  let riskLevel: 'low' | 'medium' | 'high';
+  if (percentage >= 70) {
+    riskLevel = 'low';
+  } else if (percentage >= 40) {
+    riskLevel = 'medium';
+  } else {
+    riskLevel = 'high';
+  }
+
+  return {
+    score: totalScore,
+    maxScore,
+    percentage,
+    breakdown,
+    riskLevel
+  };
 }
 
 // Find potential matches for a new item
