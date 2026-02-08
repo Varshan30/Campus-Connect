@@ -30,7 +30,10 @@ import {
   Image as ImageIcon,
   ChevronDown,
   ChevronUp,
-  Loader2
+  Loader2,
+  Brain,
+  Shield,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { categoryLabels, locationLabels, ItemCategory, CampusLocation } from '@/lib/data';
@@ -53,6 +56,30 @@ interface Claim {
     percentage: number;
     riskLevel: 'low' | 'medium' | 'high';
     breakdown?: { category: string; points: number; maxPoints: number; details: string }[];
+    aiPowered?: boolean;
+    aiInsights?: {
+      reasoning: string;
+      overallAssessment: string;
+      redFlags: string[];
+      positiveIndicators: string[];
+      confidence: string;
+    };
+  };
+  verification?: {
+    decision: 'auto_approved' | 'auto_rejected' | 'pending_review';
+    overallScore: number;
+    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    checks: { name: string; status: 'pass' | 'fail' | 'warn'; message: string; severity: string }[];
+    summary: string;
+    aiPowered: boolean;
+    aiInsights?: {
+      reasoning: string;
+      overallAssessment: string;
+      redFlags: string[];
+      positiveIndicators: string[];
+      confidence: string;
+    } | null;
+    processingTimeMs: number;
   };
   claimedAt: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -224,8 +251,23 @@ const AdminClaims = () => {
         return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Medium Risk</Badge>;
       case 'high':
         return <Badge className="bg-red-500/10 text-red-600 border-red-500/20">High Risk</Badge>;
+      case 'critical':
+        return <Badge className="bg-red-600/20 text-red-700 border-red-600/30 font-bold">⚠ Critical</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
+    }
+  };
+
+  const getDecisionBadge = (decision?: string) => {
+    switch (decision) {
+      case 'auto_approved':
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Auto-Approved</Badge>;
+      case 'auto_rejected':
+        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20"><XCircle className="h-3 w-3 mr-1" /> Auto-Rejected</Badge>;
+      case 'pending_review':
+        return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20"><Clock className="h-3 w-3 mr-1" /> Needs Review</Badge>;
+      default:
+        return null;
     }
   };
 
@@ -370,7 +412,8 @@ const AdminClaims = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-foreground">{claim.itemName}</h3>
                             {getStatusBadge(claim.status)}
-                            {claim.matchScore && getRiskBadge(claim.matchScore.riskLevel)}
+                            {claim.verification && getDecisionBadge(claim.verification.decision)}
+                            {claim.verification ? getRiskBadge(claim.verification.riskLevel) : claim.matchScore && getRiskBadge(claim.matchScore.riskLevel)}
                           </div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
@@ -395,12 +438,17 @@ const AdminClaims = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {claim.matchScore && (
+                        {(claim.verification || claim.matchScore) && (
                           <div className="text-right mr-4">
-                            <div className="text-2xl font-bold text-foreground">
-                              {claim.matchScore.percentage}%
+                            <div className={cn("text-2xl font-bold", 
+                              (claim.verification?.overallScore ?? claim.matchScore?.percentage ?? 0) >= 70 ? 'text-green-600' :
+                              (claim.verification?.overallScore ?? claim.matchScore?.percentage ?? 0) >= 40 ? 'text-yellow-600' : 'text-red-600'
+                            )}>
+                              {claim.verification?.overallScore ?? claim.matchScore?.percentage}%
                             </div>
-                            <div className="text-xs text-muted-foreground">Match Score</div>
+                            <div className="text-xs text-muted-foreground">
+                              {claim.verification ? 'Verification' : 'Match'} Score
+                            </div>
                           </div>
                         )}
                         
@@ -492,6 +540,11 @@ const AdminClaims = () => {
                               <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-primary" />
                                 Score Breakdown
+                                {claim.matchScore?.aiPowered && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 text-xs font-medium">
+                                    <Brain className="h-3 w-3" /> AI-Enhanced
+                                  </span>
+                                )}
                               </h4>
                               <div className="space-y-2">
                                 {claim.matchScore.breakdown.map((item, idx) => (
@@ -513,6 +566,101 @@ const AdminClaims = () => {
                                   </div>
                                 ))}
                               </div>
+                            </div>
+                          )}
+
+                          {/* Verification Pipeline Results */}
+                          {claim.verification && (
+                            <div className="md:col-span-2">
+                              <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-primary" />
+                                Verification Pipeline
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Timer className="h-3 w-3" /> {claim.verification.processingTimeMs}ms
+                                </span>
+                                {claim.verification.aiPowered && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 text-xs font-medium">
+                                    <Brain className="h-3 w-3" /> AI-Powered
+                                  </span>
+                                )}
+                              </h4>
+                              <div className="p-3 rounded-lg bg-muted/50 text-sm mb-3">
+                                <p className="text-muted-foreground">{claim.verification.summary}</p>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {claim.verification.checks.map((check, idx) => (
+                                  <div key={idx} className={cn(
+                                    "flex items-start gap-2 p-2.5 rounded-lg border text-sm",
+                                    check.status === 'pass' ? 'bg-green-500/5 border-green-500/20' :
+                                    check.status === 'warn' ? 'bg-yellow-500/5 border-yellow-500/20' :
+                                    'bg-red-500/5 border-red-500/20'
+                                  )}>
+                                    {check.status === 'pass' ? (
+                                      <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                                    ) : check.status === 'warn' ? (
+                                      <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                                    )}
+                                    <div>
+                                      <div className="font-medium text-foreground flex items-center gap-1.5">
+                                        {check.name}
+                                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{check.severity}</Badge>
+                                      </div>
+                                      <p className="text-muted-foreground text-xs mt-0.5">{check.message}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* AI Insights Panel */}
+                          {(claim.verification?.aiInsights || claim.matchScore?.aiInsights) && (
+                            <div className="md:col-span-2">
+                              <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <Brain className="h-4 w-4 text-purple-500" />
+                                AI Verification Insights
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium">
+                                  {(claim.verification?.aiInsights || claim.matchScore?.aiInsights)?.confidence} confidence
+                                </span>
+                              </h4>
+                              {(() => {
+                                const insights = claim.verification?.aiInsights || claim.matchScore?.aiInsights;
+                                if (!insights) return null;
+                                return (
+                                  <div className="space-y-3">
+                                    <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                                      <p className="font-medium text-foreground mb-1">Assessment</p>
+                                      <p className="text-muted-foreground">{insights.overallAssessment}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                                      <p className="font-medium text-foreground mb-1">Reasoning</p>
+                                      <p className="text-muted-foreground">{insights.reasoning}</p>
+                                    </div>
+                                    {insights.positiveIndicators.length > 0 && (
+                                      <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 text-sm">
+                                        <p className="font-medium text-green-700 dark:text-green-400 mb-1">✅ Positive Indicators</p>
+                                        <ul className="text-muted-foreground space-y-0.5">
+                                          {insights.positiveIndicators.map((indicator, i) => (
+                                            <li key={i}>• {indicator}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {insights.redFlags.length > 0 && (
+                                      <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
+                                        <p className="font-medium text-red-700 dark:text-red-400 mb-1">⚠️ Red Flags</p>
+                                        <ul className="text-muted-foreground space-y-0.5">
+                                          {insights.redFlags.map((flag, i) => (
+                                            <li key={i}>• {flag}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
 

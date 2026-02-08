@@ -6,7 +6,7 @@ import { GradientButton } from '@/components/ui/gradient-button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, orderBy, limit, arrayUnion } from 'firebase/firestore';
 import { app, db } from '../firebase';
 import {
   Popover,
@@ -23,8 +23,10 @@ interface Notification {
   id: string;
   message: string;
   read: boolean;
+  readBy?: string[];
   createdAt: any;
-  userId: string;
+  userId?: string;
+  type?: string;
 }
 
 const Header = () => {
@@ -50,7 +52,7 @@ const Header = () => {
     return () => unsubscribe();
   }, []);
 
-  // Fetch notifications for logged in user
+  // Fetch notifications — global feed visible to all users
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -59,8 +61,8 @@ const Header = () => {
 
     const q = query(
       collection(db, 'notifications'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -90,10 +92,18 @@ const Header = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
-    await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+    if (!user) return;
+    await updateDoc(doc(db, 'notifications', notificationId), {
+      readBy: arrayUnion(user.uid),
+    });
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => {
+    // Check per-user read status via readBy array
+    if (n.readBy && user) return !n.readBy.includes(user.uid);
+    // Fallback for old notifications using boolean read field
+    return !n.read;
+  }).length;
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -172,25 +182,28 @@ const Header = () => {
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {notifications.length > 0 ? (
-                    notifications.map((notification) => (
+                    notifications.map((notification) => {
+                      const isRead = notification.readBy?.includes(user?.uid || '') || notification.read;
+                      return (
                       <div
                         key={notification.id}
                         className={cn(
                           "p-3 border-b border-border/50 text-sm cursor-pointer hover:bg-muted/50",
-                          !notification.read && "bg-primary/5"
+                          !isRead && "bg-primary/5"
                         )}
-                        onClick={() => !notification.read && markAsRead(notification.id)}
+                        onClick={() => !isRead && markAsRead(notification.id)}
                       >
                         <div className="flex items-start gap-2">
-                          {!notification.read && (
+                          {!isRead && (
                             <span className="h-2 w-2 mt-1.5 rounded-full bg-primary flex-shrink-0" />
                           )}
-                          <span className={cn(!notification.read && "font-medium")}>
+                          <span className={cn(!isRead && "font-medium")}>
                             {notification.message}
                           </span>
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="p-4 text-center text-muted-foreground text-sm">
                       No notifications

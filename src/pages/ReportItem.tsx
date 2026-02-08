@@ -107,7 +107,7 @@ const ReportItem = () => {
       
       // Show success with match info
       const matchMessage = matches.length > 0 
-        ? ` We found ${matches.length} potential match${matches.length > 1 ? 'es' : ''}! Check your notifications.`
+        ? ` We found ${matches.length} potential match${matches.length > 1 ? 'es' : ''}!${matches[0]?.aiPowered ? ' (AI-verified 🤖)' : ''} Check your notifications.`
         : '';
       
       toast({

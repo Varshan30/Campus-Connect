@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { FoundItem, locationLabels, categoryLabels, ItemCategory } from '@/lib/data';
 import { notifyAll } from '@/lib/notifications';
-import { calculateMatchScore } from '@/lib/matching';
+import { verifyClaim, type ClaimVerificationResult } from '@/lib/claimVerification';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, Package, ShieldCheck, Upload, X, Mail, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle2, Package, ShieldCheck, Upload, X, Mail, Image as ImageIcon, Brain, Loader2, AlertTriangle, XCircle, Shield } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -90,6 +90,8 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailError, setEmailError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [verificationResult, setVerificationResult] = useState<ClaimVerificationResult | null>(null);
+  const [verificationStep, setVerificationStep] = useState('');
 
   // Get security questions based on item category
   const securityQuestions = useMemo(() => {
@@ -104,6 +106,8 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
     setProofImages([]);
     setEmailVerified(false);
     setEmailError('');
+    setVerificationResult(null);
+    setVerificationStep('');
   };
 
   const handleSecurityAnswerChange = (questionId: string, value: string) => {
@@ -208,12 +212,41 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
     if (!item) return;
 
     setIsSubmitting(true);
+    setVerificationStep('Running verification checks...');
     
     try {
-      // Calculate match score based on security answers
-      const matchScore = calculateMatchScore(item, securityAnswers, formData.description);
-      
-      // Save claim to Firestore
+      // ====== STEP 1: Run full claim verification pipeline ======
+      setVerificationStep('🔍 Checking claim legitimacy...');
+      const verification = await verifyClaim({
+        itemId: item.id,
+        item,
+        claimerName: formData.name,
+        claimerEmail: formData.email,
+        claimerPhone: formData.phone,
+        claimerDescription: formData.description,
+        securityAnswers,
+        proofImages,
+        userId: auth.currentUser?.uid || null,
+      });
+
+      setVerificationResult(verification);
+
+      // ====== STEP 2: Handle auto-rejection ======
+      if (verification.decision === 'auto_rejected') {
+        setVerificationStep('');
+        toast({
+          title: '❌ Claim Rejected',
+          description: verification.summary,
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return; // Don't save rejected claims
+      }
+
+      // ====== STEP 3: Save verified claim to Firestore ======
+      setVerificationStep('💾 Saving claim...');
+      const claimStatus = verification.decision === 'auto_approved' ? 'approved' : 'pending';
+
       await addDoc(collection(db, 'claims'), {
         itemId: item.id,
         itemName: item.name,
@@ -225,28 +258,70 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
         identificationDescription: formData.description,
         securityAnswers: securityAnswers,
         proofImages: proofImages,
-        matchScore: matchScore,
+        verification: {
+          decision: verification.decision,
+          overallScore: verification.overallScore,
+          riskLevel: verification.riskLevel,
+          checks: verification.checks,
+          summary: verification.summary,
+          aiPowered: !!verification.aiVerification,
+          aiInsights: verification.aiVerification ? {
+            reasoning: verification.aiVerification.reasoning,
+            overallAssessment: verification.aiVerification.overallAssessment,
+            redFlags: verification.aiVerification.redFlags,
+            positiveIndicators: verification.aiVerification.positiveIndicators,
+            confidence: verification.aiVerification.confidence,
+          } : null,
+          processingTimeMs: verification.processingTimeMs,
+        },
+        matchScore: {
+          score: verification.overallScore,
+          maxScore: 100,
+          percentage: verification.overallScore,
+          riskLevel: verification.riskLevel === 'critical' ? 'high' : verification.riskLevel,
+          breakdown: verification.checks.map(c => ({
+            category: c.name,
+            points: c.status === 'pass' ? 100 : c.status === 'warn' ? 50 : 0,
+            maxPoints: 100,
+            details: c.message,
+          })),
+          aiPowered: !!verification.aiVerification,
+          aiInsights: verification.aiVerification ? {
+            reasoning: verification.aiVerification.reasoning,
+            overallAssessment: verification.aiVerification.overallAssessment,
+            redFlags: verification.aiVerification.redFlags,
+            positiveIndicators: verification.aiVerification.positiveIndicators,
+            confidence: verification.aiVerification.confidence,
+          } : undefined,
+        },
         claimedAt: new Date().toISOString(),
-        status: 'pending',
+        status: claimStatus,
         userId: auth.currentUser?.uid || null,
       });
 
-      // Update item status to pending
+      // ====== STEP 4: Update item status ======
       await updateDoc(doc(db, 'foundItems', item.id), {
-        status: 'pending',
+        status: claimStatus === 'approved' ? 'claimed' : 'pending',
       });
 
-      // Create notification
+      // ====== STEP 5: Create notification ======
+      const decisionLabel = claimStatus === 'approved' ? '✅ Auto-Approved' : '⏳ Pending Review';
       await addDoc(collection(db, 'notifications'), {
         type: 'claim',
-        message: `New claim submitted for "${item.name}" by ${formData.name}`,
+        message: `${decisionLabel}: Claim for "${item.name}" by ${formData.name} (${verification.overallScore}% score)`,
         itemId: item.id,
-        userId: auth.currentUser?.uid || null,
+        createdBy: auth.currentUser?.uid || null,
+        readBy: [],
         read: false,
         createdAt: new Date().toISOString(),
+        verification: {
+          decision: verification.decision,
+          score: verification.overallScore,
+          riskLevel: verification.riskLevel,
+        },
       });
 
-      // Send email/Telegram notification via Formspree
+      // ====== STEP 6: Send external notifications ======
       await notifyAll({
         type: 'claim',
         itemName: item.name,
@@ -255,15 +330,19 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
         userName: formData.name,
         userEmail: formData.email,
         userPhone: formData.phone,
-        description: formData.description,
+        description: `[${decisionLabel}] Score: ${verification.overallScore}% | ${formData.description}`,
         timestamp: new Date().toLocaleString(),
       });
 
       setIsSuccess(true);
+      setVerificationStep('');
       
+      const isAutoApproved = verification.decision === 'auto_approved';
       toast({
-        title: 'Claim submitted!',
-        description: 'We will contact you shortly to verify your claim.',
+        title: isAutoApproved ? '✅ Claim Approved!' : '⏳ Claim Under Review',
+        description: isAutoApproved
+          ? `Your claim has been automatically verified and approved! (${verification.overallScore}% confidence)`
+          : `Your claim is pending admin review. Verification score: ${verification.overallScore}%.`,
       });
 
       // Notify parent component
@@ -271,20 +350,22 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
         onClaimSubmitted(item.id);
       }
 
-      // Reset after showing success
+      // Reset after showing success — give user time to read the result
       setTimeout(() => {
         setIsSuccess(false);
         resetForm();
         onOpenChange(false);
-      }, 2000);
-    } catch (error) {
+      }, 5000);
+    } catch (error: any) {
+      console.error('Claim submission error:', error);
       toast({
         title: 'Submission failed',
-        description: 'There was an error submitting your claim. Please try again.',
+        description: error?.message || 'There was an error submitting your claim. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
+      setVerificationStep('');
     }
   };
 
@@ -293,17 +374,85 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        {isSuccess ? (
-          <div className="py-8 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-8 w-8 text-primary" />
+        {isSuccess && verificationResult ? (
+          <div className="py-6 space-y-4">
+            {/* Decision Header */}
+            <div className="text-center">
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                verificationResult.decision === 'auto_approved'
+                  ? 'bg-green-500/10'
+                  : 'bg-yellow-500/10'
+              }`}>
+                {verificationResult.decision === 'auto_approved' ? (
+                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                ) : (
+                  <Shield className="h-8 w-8 text-yellow-600" />
+                )}
+              </div>
+              <h3 className="font-display text-xl font-semibold text-foreground mb-1">
+                {verificationResult.decision === 'auto_approved' ? 'Claim Approved!' : 'Claim Under Review'}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {verificationResult.decision === 'auto_approved'
+                  ? 'Your ownership has been verified automatically.'
+                  : 'An admin will review your claim shortly.'}
+              </p>
             </div>
-            <h3 className="font-display text-xl font-semibold text-foreground mb-2">
-              Claim Submitted!
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              We'll review your claim and contact you soon.
-            </p>
+
+            {/* Score */}
+            <div className="flex items-center justify-center gap-3">
+              <div className={`text-3xl font-bold ${
+                verificationResult.overallScore >= 70 ? 'text-green-600' :
+                verificationResult.overallScore >= 40 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {verificationResult.overallScore}%
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Verification<br />Score
+              </div>
+            </div>
+
+            {/* Checks summary */}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {verificationResult.checks.map((check, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  {check.status === 'pass' ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                  ) : check.status === 'warn' ? (
+                    <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 mt-0.5 shrink-0" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                  )}
+                  <div>
+                    <span className="font-medium text-foreground">{check.name}:</span>{' '}
+                    <span className="text-muted-foreground">{check.message}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* AI badge */}
+            {verificationResult.aiVerification && (
+              <div className="text-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 text-xs font-medium">
+                  <Brain className="h-3 w-3" />
+                  AI-Powered Verification • {verificationResult.processingTimeMs}ms
+                </span>
+              </div>
+            )}
+          </div>
+        ) : isSubmitting ? (
+          <div className="py-12 text-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground mb-1">Verifying Your Claim</h3>
+              <p className="text-sm text-muted-foreground animate-pulse">{verificationStep || 'Please wait...'}</p>
+            </div>
+            <div className="space-y-1 text-xs text-muted-foreground max-w-xs mx-auto">
+              <p>🔍 Checking claim legitimacy</p>
+              <p>🛡️ Running fraud detection</p>
+              <p>🤖 AI ownership analysis</p>
+            </div>
           </div>
         ) : (
           <>
@@ -467,7 +616,7 @@ const ClaimDialog = ({ item, open, onOpenChange, onClaimSubmitted }: ClaimDialog
                   Cancel
                 </Button>
                 <GradientButton type="submit" className="flex-1" disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+                  {isSubmitting ? 'Verifying...' : '🛡️ Verify & Claim'}
                 </GradientButton>
               </div>
             </form>

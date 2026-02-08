@@ -8,6 +8,7 @@ import ItemCarousel from '@/components/ItemCarousel';
 import { Button } from '@/components/ui/button';
 import { GradientLinkButton } from '@/components/ui/gradient-button';
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern';
+import { FlickeringGrid } from '@/components/ui/flickering-grid';
 import { typewriterPhrases, categoryLabels, ItemCategory, FoundItem } from '@/lib/data';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -29,6 +30,20 @@ const Landing = () => {
   const [loading, setLoading] = useState(true);
   const [claimedCount, setClaimedCount] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [gridColor, setGridColor] = useState('rgb(99, 102, 241)');
+
+  // Detect dark mode for grid color
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setGridColor(isDark ? 'rgb(165, 180, 252)' : 'rgb(99, 102, 241)');
+
+    const observer = new MutationObserver(() => {
+      const dark = document.documentElement.classList.contains('dark');
+      setGridColor(dark ? 'rgb(165, 180, 252)' : 'rgb(99, 102, 241)');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Real-time listener for Firestore items
   useEffect(() => {
@@ -96,6 +111,16 @@ const Landing = () => {
             "[mask-image:radial-gradient(600px_circle_at_center,white,transparent)]",
             "inset-x-0 inset-y-[-30%] h-[200%]",
           )}
+        />
+
+        {/* Flickering Grid Background */}
+        <FlickeringGrid
+          className="absolute inset-0 z-0 [mask-image:radial-gradient(600px_circle_at_center,white,transparent)]"
+          squareSize={4}
+          gridGap={6}
+          color={gridColor}
+          maxOpacity={0.15}
+          flickerChance={0.1}
         />
         
         {/* Background gradient */}
@@ -234,6 +259,15 @@ const Landing = () => {
 
       {/* Categories Section */}
       <section className="py-20 overflow-hidden relative">
+        {/* Subtle flickering grid in categories */}
+        <FlickeringGrid
+          className="absolute inset-0 z-0 [mask-image:linear-gradient(to_bottom,transparent,white_20%,white_80%,transparent)]"
+          squareSize={3}
+          gridGap={8}
+          color={gridColor}
+          maxOpacity={0.08}
+          flickerChance={0.05}
+        />
         <div className="container mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -351,6 +385,16 @@ const Landing = () => {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary to-secondary p-8 md:p-16 text-center">
+            {/* Flickering Grid on CTA */}
+            <FlickeringGrid
+              className="absolute inset-0 z-0"
+              squareSize={4}
+              gridGap={6}
+              color="rgb(255, 255, 255)"
+              maxOpacity={0.2}
+              flickerChance={0.15}
+            />
+
             {/* Background pattern */}
             <div className="absolute inset-0 opacity-10">
               <div className="absolute top-0 left-0 w-40 h-40 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2" />
